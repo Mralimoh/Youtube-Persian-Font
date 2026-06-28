@@ -5,8 +5,8 @@
 // @description  Persian Font.
 // @author       Mralimoh
 // @match        https://www.youtube.com/*
-// @resource     VAZIR_FONT https://cdnjs.cloudflare.com/ajax/libs/vazir-font/30.1.0/Vazir-Thin.woff
-// @resource     SHABNAM_FONT https://cdnjs.cloudflare.com/ajax/libs/shabnam-font/5.0.1/Shabnam-Thin.woff
+// @resource     VAZIR_FONT https://cdn.jsdelivr.net/npm/vazirmatn@33.0.3/fonts/webfonts/Vazirmatn-Thin.woff2
+// @resource     SHABNAM_FONT https://cdn.jsdelivr.net/gh/rastikerdar/shabnam-font@v5.0.1/dist/Shabnam-Thin.woff2
 // @grant        GM_setValue
 // @grant        GM_getValue
 // @grant        GM_getResourceURL
@@ -40,17 +40,25 @@
                 font-family: 'Roboto';
                 src: url('${font.url}') format('woff');
                 unicode-range: ${PERSIAN_UNICODE_RANGE};
-                font-display: block;
-                size-adjust: 114%;
                 font-weight: 100 900;
             }
 
-            html[dark] ytd-topbar-logo-renderer yt-icon#logo-icon {
+            ytd-topbar-logo-renderer yt-icon {
                 width: 98px !important;
                 content: url("${PREMIUM_LOGO}") !important;
             }
 
-            ytd-topbar-logo-renderer ytd-yoodle-renderer {
+            ytd-rich-grid-renderer[elements-per-row="3"] {
+                --ytd-rich-grid-items-per-row: 4 !important;
+            }
+
+            ytd-rich-item-renderer[items-per-row="3"] {
+                width: calc(25% - 16px) !important;
+            }
+
+            ytd-topbar-logo-renderer ytd-yoodle-renderer,
+            ytd-feed-filter-chip-bar-renderer,
+            ytd-rich-section-renderer {
                 display: none !important;
             }
 
