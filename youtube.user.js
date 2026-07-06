@@ -1,18 +1,19 @@
 // ==UserScript==
-// @name         Custom YouTube
+// @name         YouTube
 // @namespace    https://github.com/Mralimoh
 // @version      1.0
-// @description  
+// @description
 // @author       Mralimoh
 // @match        https://www.youtube.com/*
 // @resource     VAZIR_FONT https://cdn.jsdelivr.net/npm/vazirmatn@33.0.3/fonts/webfonts/Vazirmatn-Thin.woff2
-// @resource     SHABNAM_FONT https://cdn.jsdelivr.net/gh/rastikerdar/shabnam-font@v5.0.1/dist/Shabnam-Thin.woff2
+// @resource     SHABNAM_FONT https://cdn.jsdelivr.net/npm/shabnam-font@5.0.0/dist/Shabnam-Thin.woff2
 // @grant        GM_setValue
 // @grant        GM_getValue
 // @grant        GM_getResourceURL
 // @grant        GM_registerMenuCommand
 // @grant        GM_unregisterMenuCommand
 // @run-at       document-start
+// @noframes
 // ==/UserScript==
 
 (function() {
@@ -34,8 +35,6 @@
     const QUALITY_PATCHED = Symbol('qualityPatched');
     const PREFERRED_QUALITIES = ['hd1080', 'hd720', 'large', 'medium', 'small', 'tiny'];
 
-    const cache = new Map();
-    let lastId = null;
     let menuIds = [];
     const activeFontKey = GM_getValue('SELECTED_FONT', 'shabnam');
     const aiStyleSheet = new CSSStyleSheet();
@@ -45,30 +44,21 @@
         return `
             @font-face {
                 font-family: 'Roboto';
-                src: url('${font.url}') format('woff');
+                src: url('${font.url}') format('woff2');
                 unicode-range: ${PERSIAN_UNICODE_RANGE};
                 font-weight: 100 900;
             }
 
-            ytd-topbar-logo-renderer yt-icon {
+            ytd-topbar-logo-renderer ytd-logo yt-icon {
                 width: 98px !important;
                 content: url("${PREMIUM_LOGO}") !important;
             }
 
-            ytd-rich-grid-renderer[elements-per-row="3"] {
-                --ytd-rich-grid-items-per-row: 4 !important;
-            }
-
-            ytd-rich-item-renderer[items-per-row="3"] {
-                width: calc(25% - 16px) !important;
-            }
-
-            ytd-topbar-logo-renderer ytd-yoodle-renderer,
-            ytd-rich-grid-renderer ytd-rich-section-renderer {
+            ytd-masthead ytd-topbar-logo-renderer ytd-yoodle-renderer {
                 display: none !important;
             }
 
-            .ytp-caption-window-container .caption-window {
+            ytd-player .ytp-caption-window-container .caption-window {
                 top: auto !important;
                 right: 0 !important;
                 bottom: 10% !important;
@@ -77,9 +67,13 @@
                 margin: 0 auto !important;
             }
 
-            .ytp-caption-window-container .ytp-caption-segment {
+            ytd-player .ytp-caption-segment {
                 fill: #8C8C00 !important;
                 color: #8C8C00 !important;
+            }
+
+            ytd-rich-item-renderer yt-lockup-metadata-view-model a.ytLockupMetadataViewModelTitle {
+                padding-left: 2px !important;
             }
         `;
     }
@@ -106,13 +100,17 @@
             player.getAvailableQualityLevels() : [];
 
         for (const q of PREFERRED_QUALITIES) {
-            if (levels.includes(q)) return q;
+            if (levels.includes(q)) {
+                return q;
+            }
         }
         return 'hd1080';
     }
 
     function patchPlayerQuality(player) {
-        if (!player || player[QUALITY_PATCHED]) return;
+        if (!player || player[QUALITY_PATCHED]) {
+            return;
+        }
         player[QUALITY_PATCHED] = true;
 
         const originalSetQuality = player.setPlaybackQuality;
@@ -153,7 +151,8 @@
 
     function initPlayerWatcher() {
         const checkAndPatch = () => {
-            const player = document.getElementById('movie_player');
+            const ytdPlayer = document.querySelector('ytd-player');
+            const player = ytdPlayer ? ytdPlayer.querySelector('#movie_player') : null;
             if (player && typeof player.getAvailableQualityLevels === 'function') {
                 patchPlayerQuality(player);
             }
@@ -163,107 +162,11 @@
         checkAndPatch();
     }
 
-    function calculateTimeDiff(publishDate) {
-        const now = new Date();
-        let cursor = new Date(publishDate);
-        const diff = {};
-        const units = ['year', 'month', 'day', 'hour', 'minute'];
-
-        units.forEach(unit => {
-            let count = 0;
-            while (true) {
-                const next = new Date(cursor);
-                if (unit === 'year') next.setFullYear(cursor.getFullYear() + 1);
-                else if (unit === 'month') next.setMonth(cursor.getMonth() + 1);
-                else if (unit === 'day') next.setDate(cursor.getDate() + 1);
-                else if (unit === 'hour') next.setHours(cursor.getHours() + 1);
-                else if (unit === 'minute') next.setMinutes(cursor.getMinutes() + 1);
-
-                if (next > now) break;
-                cursor = next;
-                count++;
-            }
-            if (count > 0) diff[unit] = count;
-        });
-
-        const totalHours = (now - new Date(publishDate)) / (1000 * 60 * 60);
-        if (totalHours >= 24) {
-            delete diff.minute;
+    document.addEventListener('loadstart', (e) => {
+        if (e.target.tagName === 'VIDEO' && e.target.closest('ytd-channel-video-player-renderer ytd-player')) {
+            e.target.pause();
         }
-
-        const result = Object.entries(diff)
-            .map(([name, value]) => `${value} ${name}${value > 1 ? 's' : ''}`)
-            .join(', ');
-
-        return result ? `${result} ago` : 'just now';
-    }
-
-    async function getExactDate(videoId) {
-        if (cache.has(videoId)) return cache.get(videoId);
-
-        try {
-            const ytcfg = unsafeWindow.ytcfg;
-            const context = {
-                client: {
-                    clientName: ytcfg.get('INNERTUBE_CLIENT_NAME') || ytcfg.get('INNERTUBE_CONTEXT')?.client?.clientName,
-                    clientVersion: ytcfg.get('INNERTUBE_CLIENT_VERSION')
-                }
-            };
-            const apiKey = ytcfg.get('INNERTUBE_API_KEY');
-
-            const response = await fetch(`https://www.youtube.com/youtubei/v1/player?key=${apiKey}`, {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                    "X-Goog-FieldMask": "microformat.playerMicroformatRenderer.publishDate"
-                },
-                body: JSON.stringify({
-                    context,
-                    videoId
-                })
-            });
-
-            const data = await response.json();
-            const date = data.microformat?.playerMicroformatRenderer?.publishDate;
-
-            if (date) {
-                const result = calculateTimeDiff(date);
-                cache.set(videoId, result);
-                return result;
-            }
-        } catch (e) {}
-        return null;
-    }
-
-    document.addEventListener('mouseover', async (event) => {
-        const renderer = event.target.closest('ytd-rich-item-renderer');
-        if (!renderer) {
-            lastId = null;
-            return;
-        }
-
-        const anchor = renderer.querySelector('a[href*="/watch?v="]');
-        if (!anchor) return;
-
-        const url = new URL(anchor.href, window.location.origin);
-        const videoId = url.searchParams.get('v');
-
-        if (videoId && videoId.length === 11 && videoId !== lastId) {
-            lastId = videoId;
-
-            const metadataSpans = renderer.querySelectorAll('.ytContentMetadataViewModelMetadataText');
-            const dateSpan = Array.from(metadataSpans).find(span =>
-                span.textContent.includes('ago') || (span.getAttribute('aria-label')?.includes('ago'))
-            );
-
-            if (dateSpan) {
-                const exactAge = await getExactDate(videoId);
-                if (exactAge) {
-                    dateSpan.textContent = exactAge;
-                }
-            }
-        }
-    });
+    }, true);
 
     applyFont(activeFontKey);
     initPlayerWatcher();
