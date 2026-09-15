@@ -2,11 +2,11 @@
 // @name         YouTube
 // @namespace    https://github.com/Mralimoh
 // @version      1.0
-// @description
+// @description huh?
 // @author       Mralimoh
 // @match        https://www.youtube.com/*
-// @resource     VAZIR_FONT https://cdn.jsdelivr.net/npm/vazirmatn@33.0.3/fonts/webfonts/Vazirmatn-Thin.woff2
-// @resource     SHABNAM_FONT https://cdn.jsdelivr.net/npm/shabnam-font@5.0.0/dist/Shabnam-Thin.woff2
+// @resource     VAZIR_FONT https://cdn.jsdelivr.net/npm/vazirmatn@33.0.3/fonts/webfonts/Vazirmatn-Regular.woff2
+// @resource     SHABNAM_FONT https://cdn.jsdelivr.net/npm/shabnam-font@5.0.0/dist/Shabnam.woff2
 // @grant        GM_setValue
 // @grant        GM_getValue
 // @grant        GM_getResourceURL
@@ -14,7 +14,6 @@
 // @grant        GM_unregisterMenuCommand
 // @grant        unsafeWindow
 // @run-at       document-start
-// @noframes
 // ==/UserScript==
 
 (function() {
@@ -95,6 +94,11 @@
             ytd-player .ytp-caption-segment {
                 fill: #8C8C00 !important;
                 color: #8C8C00 !important;
+            }
+
+            ytd-watch-metadata h1 yt-formatted-string {
+                text-align: right !important;
+                unicode-bidi: plaintext !important;
             }
         `;
     }
@@ -211,6 +215,8 @@
     }, true);
 
     applyFont(activeFontKey);
-    initPlayerWatcher();
-    initLogoFix();
+    if (window === window.top) {
+        initPlayerWatcher();
+        initLogoFix();
+    }
 })();
